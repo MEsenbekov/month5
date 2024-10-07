@@ -21,8 +21,9 @@ class Movie(models.Model):
 class Review(models.Model):
     movie = models.ForeignKey(Movie, on_delete=models.CASCADE, related_name='reviews')
     text = models.TextField()
+    stars = models.PositiveSmallIntegerField(default=1)
 
     def __str__(self):
-        return self.text[:50]
+        return f'{self.text[:50]} - {self.stars} stars'
 
 # Create your models here.
