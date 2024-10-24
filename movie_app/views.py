@@ -1,48 +1,72 @@
 from django.db.models import Avg
-from django.shortcuts import render
-from rest_framework.generics import RetrieveUpdateDestroyAPIView, ListCreateAPIView
+from rest_framework import generics, status
+from rest_framework.response import Response
+from rest_framework.views import APIView
 
-from . import models
 from .models import Director, Movie, Review
-from rest_framework import generics
+from .serializers import DirectorSerializer, MovieSerializer, ReviewSerializer, MovieWithReviewsSerializer, \
+    UserRegistrationSerializer, UserConfirmationSerializer
 
-from .serializers import DirectorSerializer, MovieSerializer, ReviewSerializer, MovieWithReviewsSerializer
 
-
-class DirectorList(generics.ListCreateAPIView):
+# Directors
+class DirectorListCreateView(generics.ListCreateAPIView):
     queryset = Director.objects.all()
     serializer_class = DirectorSerializer
 
 
-class DirectorDetail(generics.RetrieveUpdateDestroyAPIView):
+class DirectorRetrieveUpdateDestroyView(generics.RetrieveUpdateDestroyAPIView):
     queryset = Director.objects.all()
     serializer_class = DirectorSerializer
 
 
-class MovieList(generics.ListCreateAPIView):
+# Movies
+class MovieListCreateView(generics.ListCreateAPIView):
     queryset = Movie.objects.all()
     serializer_class = MovieSerializer
 
 
-class MovieDetail(generics.RetrieveUpdateDestroyAPIView):
+class MovieRetrieveUpdateDestroyView(generics.RetrieveUpdateDestroyAPIView):
     queryset = Movie.objects.all()
     serializer_class = MovieSerializer
 
 
-class ReviewList(generics.ListCreateAPIView):
+# Reviews
+class ReviewListCreateView(generics.ListCreateAPIView):
     queryset = Review.objects.all()
     serializer_class = ReviewSerializer
 
 
-class ReviewDetail(generics.RetrieveUpdateDestroyAPIView):
+class ReviewRetrieveUpdateDestroyView(generics.RetrieveUpdateDestroyAPIView):
     queryset = Review.objects.all()
     serializer_class = ReviewSerializer
 
 
+# Movies with Reviews
 class MovieReviewListAPIView(generics.ListAPIView):
     serializer_class = MovieWithReviewsSerializer
 
     def get_queryset(self):
         return Movie.objects.prefetch_related('reviews').annotate(average_rating=Avg('reviews__stars'))
 
-# Create your views here.
+
+# User registration and confirmation
+class UserRegistrationView(generics.CreateAPIView):
+    serializer_class = UserRegistrationSerializer
+
+    def create(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        if serializer.is_valid():
+            serializer.save()
+            return Response({"message": "Пользователь зарегистрирован, проверьте почту для получения кода."}, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+class UserConfirmationView(generics.GenericAPIView):
+    serializer_class = UserConfirmationSerializer
+
+    def post(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        if serializer.is_valid():
+            serializer.save()
+            return Response({"message": "Пользователь успешно подтвержден."}, status=status.HTTP_200_OK)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)

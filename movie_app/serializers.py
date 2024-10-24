@@ -1,5 +1,8 @@
 from rest_framework import serializers
-from .models import Director, Movie, Review
+from rest_framework.authtoken.admin import User
+
+from .models import Director, Movie, Review, ConfirmationCode
+
 
 class DirectorSerializer(serializers.ModelSerializer):
     class Meta:
@@ -63,3 +66,44 @@ class MovieWithReviewsSerializer(serializers.ModelSerializer):
             average_rating = sum([review.stars for review in reviews]) / reviews.count()
             return round(average_rating, 2)
         return 0
+
+
+class UserRegistrationSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = User
+        fields = ('username', 'password', 'email')
+
+    def create(self, validated_data):
+        user = User.objects.create_user(
+            username=validated_data['username'],
+            password=validated_data['password'],
+            email=validated_data['email'],
+            is_active=False  # Пользователь создается неактивным
+        )
+        ConfirmationCode.objects.create(user=user)  # Генерация и привязка кода
+        return user
+
+
+class UserConfirmationSerializer(serializers.Serializer):
+    username = serializers.CharField()
+    code = serializers.CharField()
+
+    def validate(self, data):
+        try:
+            user = User.objects.get(username=data['username'])
+            confirmation_code = ConfirmationCode.objects.get(user=user)
+        except User.DoesNotExist:
+            raise serializers.ValidationError("Пользователь не найден.")
+        except ConfirmationCode.DoesNotExist:
+            raise serializers.ValidationError("Код подтверждения не найден.")
+
+        if confirmation_code.code != data['code']:
+            raise serializers.ValidationError("Неверный код подтверждения.")
+
+        return data
+
+    def save(self, validated_data):
+        user = User.objects.get(username=validated_data['username'])
+        user.is_active = True  # Активируем пользователя
+        user.save()
+        ConfirmationCode.objects.get(user=user).delete()  # Удаляем код после подтверждения
